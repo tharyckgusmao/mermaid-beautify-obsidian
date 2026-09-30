@@ -14,7 +14,11 @@ It was inspired by the awesome new plugin for publishing your note content to Co
 
 ## Usage
 
-Allows you to apply other themes to your mermaid diagrams in your notes. There are two main options, which are mutually exclusive. Either you supply an entire mermaid theme object, or you provide the parts of that object that you want to change. The plugin will then merge your customizations with the base theme, and apply the result to your diagrams. Documentations about how to create and use mermaid themes [can be found here](https://mermaid.js.org/config/theming.html).
+Choose a built-in Mermaid theme or one of the curated palettes in the plugin settings. The palette gallery previews coordinated node fills, text, borders, and connectors. The curated palettes include Zinc, Tokyo Night, Catppuccin, Nord, Dracula, GitHub, Solarized, One Dark, Obsidian, Paper & Amber, Mint Night, Lavender Dusk, Coral & Slate, and Pastel Reverie.
+
+Mermaid diagrams include zoom controls below each diagram. Use `+` and `−` to zoom, `↺` to fit the diagram in the available view without changing its proportions, drag to pan, pinch on touch screens, or `⛶` to expand the diagram over the note. Press `Escape` or `×` to return to the note. The `Scroll` control enables wheel zoom for an individual diagram; while disabled, the wheel continues to scroll the note.
+
+Custom theme JSON is layered over the selected palette. It uses Mermaid's `base` theme and `themeVariables`, so existing Mermaid diagram syntax and diagram types continue to use Mermaid's renderer. Documentation about customizing Mermaid themes [is available here](https://mermaid.js.org/config/theming.html).
 
 The `mermaid` code fence label is reserved. You have to use `merm` as an alternate. The code block looks like:
 

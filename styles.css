@@ -1,4 +1,305 @@
 .mermaid-themes-settings > * > textarea {
-	width: 30em;
-	min-height: 30em;
+	width: min(42em, 100%);
+	min-height: 24em;
+	font-family: var(--font-monospace);
 }
+
+.mermaid-theme-intro {
+	max-width: 58em;
+	color: var(--text-muted);
+}
+
+.mermaid-theme-diagram {
+	position: relative;
+}
+
+.mermaid-zoom-controls {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 4px;
+	min-height: 30px;
+	margin-top: 8px;
+}
+
+.mermaid-zoom-controls > button {
+	min-width: 30px;
+	min-height: 28px;
+	padding: 2px 7px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.mermaid-zoom-controls > button.is-active {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+}
+
+.mermaid-zoom-level {
+	min-width: 42px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	text-align: center;
+}
+
+.mermaid-zoom-viewport {
+	position: relative;
+	width: 100%;
+	height: min(70vh, 560px);
+	min-height: 160px;
+	overflow: hidden;
+	border-radius: 6px;
+	touch-action: none;
+}
+
+.mermaid-zoom-canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform-origin: top left;
+	will-change: transform;
+}
+
+.mermaid-theme-zoom-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	width: 100vw;
+	height: 100vh;
+	padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+	overflow: hidden;
+	background: var(--background-primary);
+}
+
+.mermaid-theme-zoom-modal-viewport {
+	position: relative;
+	flex: 1 1 auto;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	max-height: none;
+	overflow: hidden;
+	touch-action: none;
+}
+
+.mermaid-theme-zoom-modal-canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform-origin: top left;
+	will-change: transform;
+}
+
+.mermaid-theme-zoom-modal-controls {
+	position: relative;
+	z-index: 1;
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+	margin-top: 12px;
+}
+
+.mermaid-theme-zoom-modal-button {
+	min-width: 34px;
+	min-height: 34px;
+	padding: 4px 9px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-size: 16px;
+	cursor: pointer;
+}
+
+.mermaid-theme-zoom-modal-button:hover {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+}
+
+.mermaid-theme-zoom-modal-scale {
+	min-width: 48px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	text-align: center;
+}
+
+.mermaid-theme-section {
+	display: flow-root;
+	position: relative;
+	margin: 2em 0 2.5em;
+}
+
+.mermaid-theme-section h3 {
+	margin-bottom: 0.35em;
+}
+
+.mermaid-theme-gallery {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+	grid-auto-rows: minmax(0, auto);
+	align-items: stretch;
+	gap: 12px;
+	margin-top: 12px;
+}
+
+.mermaid-theme-section .mermaid-theme-gallery > .mermaid-theme-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	box-sizing: border-box;
+	width: 100%;
+	height: auto !important;
+	min-width: 0;
+	min-height: 132px;
+	max-height: none;
+	overflow: hidden;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font: inherit;
+	line-height: normal;
+	white-space: normal;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.mermaid-theme-card:hover {
+	border-color: var(--interactive-accent);
+	transform: translateY(-2px);
+}
+
+.mermaid-theme-card:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.mermaid-theme-card.is-selected {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+}
+
+.mermaid-theme-preview {
+	position: relative;
+	display: flex;
+	flex: 0 0 76px;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	height: 76px;
+	min-height: 76px;
+	padding: 12px 8px;
+	border-radius: 8px;
+	background: var(--preview-bg);
+	color: var(--preview-fg);
+	overflow: hidden;
+}
+
+.mermaid-theme-preview-node {
+	position: relative;
+	z-index: 1;
+	padding: 7px 9px;
+	border: 1px solid var(--preview-border);
+	border-radius: 6px;
+	background: var(--preview-surface);
+	color: var(--preview-fg);
+	font-size: 10px;
+	line-height: 1.2;
+	white-space: nowrap;
+	flex: 0 1 auto;
+}
+
+.mermaid-theme-preview-node.is-series-1,
+.mermaid-theme-preview-node.is-series-2,
+.mermaid-theme-preview-node.is-series-3 {
+	border-color: var(--preview-series-1, var(--preview-border));
+	box-shadow: inset 0 2px 0 var(--preview-series-1, var(--preview-border));
+}
+
+.mermaid-theme-preview-node.is-series-2 {
+	border-color: var(--preview-series-2, var(--preview-border));
+	box-shadow: inset 0 2px 0 var(--preview-series-2, var(--preview-border));
+}
+
+.mermaid-theme-preview-node.is-series-3 {
+	border-color: var(--preview-series-3, var(--preview-border));
+	box-shadow: inset 0 2px 0 var(--preview-series-3, var(--preview-border));
+}
+
+.mermaid-theme-preview-edge {
+	width: clamp(8px, 8%, 18px);
+	min-width: 6px;
+	flex: 0 1 18px;
+	height: 2px;
+	margin-inline: 2px;
+	background: var(--preview-accent);
+}
+
+.mermaid-theme-preview-edge.is-muted {
+	background: var(--preview-muted);
+}
+
+.mermaid-theme-card-caption {
+	display: flex;
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 9px 3px 2px;
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+}
+
+.mermaid-theme-card-caption > span:first-child {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mermaid-theme-mode {
+	flex: 0 0 auto;
+	padding: 2px 6px;
+	border-radius: 999px;
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: 10px;
+	font-weight: 500;
+}
+
+.mermaid-theme-swatches {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 4px;
+	width: 100%;
+	padding: 2px 3px 1px;
+}
+
+.mermaid-theme-swatch {
+	height: 6px;
+	border-radius: 999px;
+	background: var(--preview-series-1);
+}
+
+.mermaid-theme-swatch.series-2 { background: var(--preview-series-2); }
+.mermaid-theme-swatch.series-3 { background: var(--preview-series-3); }
+.mermaid-theme-swatch.series-4 { background: var(--preview-series-4); }
+.mermaid-theme-swatch.series-5 { background: var(--preview-series-5); }
+.mermaid-theme-swatch.series-6 { background: var(--preview-series-6); }
