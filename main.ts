@@ -65,6 +65,14 @@ function mixHex(foreground: string, background: string, backgroundWeight: number
 	return `#${[16, 8, 0].map((shift) => channel(shift).toString(16).padStart(2, "0")).join("")}`;
 }
 
+function getPaletteVisuals(palette: ThemePalette) {
+	return {
+		nodeFill: mixHex(palette.accent, palette.surface, 0.94),
+		nodeBorder: mixHex(palette.accent, palette.border, 0.72),
+		connector: mixHex(palette.fg, palette.bg, palette.group === "Light" ? 0.14 : 0.2),
+	};
+}
+
 const THEME_SECTIONS = [
 	{ title: "Inspired by beautiful-mermaid", description: "Curated palettes with coordinated node, label, and connector colors.", ids: ["zinc-light", "zinc-dark", "tokyo-night", "tokyo-night-storm", "tokyo-night-light", "catppuccin-mocha", "catppuccin-latte", "nord", "nord-light", "dracula", "github-light", "github-dark", "solarized-light", "solarized-dark", "one-dark"] },
 	{ title: "Obsidian & studio", description: "Additional palettes designed for focused notes and clear diagrams.", ids: ["obsidian-light", "obsidian-dark", "paper-amber", "mint-night", "lavender-dusk"] },
@@ -264,14 +272,17 @@ export default class MermaidThemePlugin extends Plugin {
 		canvas.className = "mermaid-theme-zoom-modal-canvas";
 		const svg = sourceSvg.cloneNode(true) as SVGSVGElement;
 		const viewBox = svg.viewBox?.baseVal;
-		const width = viewBox?.width || parseFloat(svg.getAttribute("width") || "") || sourceSvg.getBoundingClientRect().width || 300;
-		const height = viewBox?.height || parseFloat(svg.getAttribute("height") || "") || sourceSvg.getBoundingClientRect().height || 200;
+		let width = viewBox?.width || parseFloat(svg.getAttribute("width") || "") || sourceSvg.getBoundingClientRect().width || 300;
+		let height = viewBox?.height || parseFloat(svg.getAttribute("height") || "") || sourceSvg.getBoundingClientRect().height || 200;
 		svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-		svg.style.width = `${width}px`;
-		svg.style.height = `${height}px`;
-		svg.style.maxWidth = "none";
-		canvas.style.width = `${width}px`;
-		canvas.style.height = `${height}px`;
+		// The inline renderer sets pixel width/height for its own viewport.
+		// Restore a natural SVG size in the modal so those inline constraints
+		// do not distort the copied diagram when the wrapper is transformed.
+		if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+			svg.style.removeProperty("width");
+			svg.style.removeProperty("height");
+			svg.style.maxWidth = `${viewBox.width}px`;
+		}
 		canvas.appendChild(svg);
 		viewport.appendChild(canvas);
 
@@ -373,7 +384,10 @@ export default class MermaidThemePlugin extends Plugin {
 		document.body.appendChild(modal);
 		document.addEventListener("keydown", handleKeydown);
 		window.requestAnimationFrame(() => {
-			fitScale = Math.min(1, 2, (viewport.clientWidth - 64) / width, (viewport.clientHeight - 64) / height);
+			const cloneRect = svg.getBoundingClientRect();
+			width = cloneRect.width || viewBox?.width || width;
+			height = cloneRect.height || viewBox?.height || height;
+			fitScale = Math.min(2, (viewport.clientWidth - 64) / width, (viewport.clientHeight - 64) / height);
 			fitScale = fitScale > 0 ? fitScale : 1;
 			scale = fitScale;
 			x = Math.max(0, (viewport.clientWidth - width * scale) / 2);
@@ -415,6 +429,7 @@ export default class MermaidThemePlugin extends Plugin {
 
 	private getPaletteConfig(palette: ThemePalette) {
 		const { bg, fg, accent, muted, surface, border } = palette;
+		const { nodeFill, nodeBorder, connector } = getPaletteVisuals(palette);
 		const seriesColors = palette.seriesColors ?? [accent, muted, border, fg, accent, muted, border, fg, accent, muted, border, fg];
 		const seriesFills = palette.seriesFills ?? [surface, bg, surface, bg, surface, bg, surface, bg, surface, bg, surface, bg];
 		const accentSoft = mixHex(accent, bg, 0.78);
@@ -434,29 +449,35 @@ export default class MermaidThemePlugin extends Plugin {
 			look: "classic",
 			themeVariables: {
 				background: bg,
-				primaryColor: surface,
+				primaryColor: nodeFill,
 				primaryTextColor: fg,
-				primaryBorderColor: border,
-				lineColor: accent,
+				primaryBorderColor: nodeBorder,
+				lineColor: connector,
 				secondaryColor: bg,
 				secondaryTextColor: fg,
-				secondaryBorderColor: border,
+				secondaryBorderColor: nodeBorder,
 				tertiaryColor: surface,
 				tertiaryTextColor: fg,
-				tertiaryBorderColor: border,
+				tertiaryBorderColor: nodeBorder,
 				textColor: fg,
-				mainBkg: surface,
+				mainBkg: nodeFill,
 				secondBkg: bg,
 				clusterBkg: bg,
-				clusterBorder: border,
-				nodeBorder: border,
+				clusterBorder: nodeBorder,
+				nodeBorder,
+				defaultLinkColor: connector,
+				actorLineColor: connector,
+				signalColor: connector,
+				signalTextColor: connector,
+				transitionColor: connector,
+				flowContainerStroke: nodeBorder,
 				edgeLabelBackground: bg,
-				actorBkg: surface,
-				actorBorder: border,
+				actorBkg: nodeFill,
+				actorBorder: nodeBorder,
 				actorTextColor: fg,
-				noteBkgColor: surface,
+				noteBkgColor: nodeFill,
 				noteTextColor: fg,
-				noteBorderColor: border,
+				noteBorderColor: nodeBorder,
 				sectionBkgColor: surface,
 				sectionBkgColor2: bg,
 				altSectionBkgColor: bg,
@@ -480,9 +501,9 @@ export default class MermaidThemePlugin extends Plugin {
 				altBackground: bg,
 				labelColor: fg,
 				loopTextColor: fg,
-				activationBkgColor: surface,
-				activationBorderColor: border,
-				sequenceNumberColor: bg,
+				activationBkgColor: nodeFill,
+				activationBorderColor: nodeBorder,
+				sequenceNumberColor: connector,
 				...colorVariables,
 				xyChart: {
 					backgroundColor: bg,
@@ -538,6 +559,7 @@ class MermaidThemeSettingTab extends PluginSettingTab {
 
 			for (const id of section.ids) {
 				const palette = THEME_PALETTES[id];
+				const visuals = getPaletteVisuals(palette);
 				const selected = this.plugin.settings.theme === id;
 				const button = gallery.createDiv({
 					cls: `mermaid-theme-card${selected ? " is-selected" : ""}`,
@@ -545,19 +567,19 @@ class MermaidThemeSettingTab extends PluginSettingTab {
 				});
 				button.style.setProperty("--preview-bg", palette.bg);
 				button.style.setProperty("--preview-fg", palette.fg);
-				button.style.setProperty("--preview-accent", palette.accent);
+				button.style.setProperty("--preview-edge", visuals.connector);
 				button.style.setProperty("--preview-muted", palette.muted);
-				button.style.setProperty("--preview-surface", palette.surface);
-				button.style.setProperty("--preview-border", palette.border);
+				button.style.setProperty("--preview-surface", visuals.nodeFill);
+				button.style.setProperty("--preview-border", visuals.nodeBorder);
 				const previewColors = palette.seriesColors ?? [palette.accent, palette.muted, palette.border, palette.fg, palette.accent, palette.muted];
 				previewColors.slice(0, 6).forEach((color, index) => button.style.setProperty(`--preview-series-${index + 1}`, color));
 
 				const preview = button.createDiv("mermaid-theme-preview");
-				preview.createDiv("mermaid-theme-preview-node is-series-1").setText("Start");
+				preview.createDiv("mermaid-theme-preview-node").setText("Start");
 				preview.createDiv("mermaid-theme-preview-edge");
-				preview.createDiv("mermaid-theme-preview-node is-series-2").setText("Decision");
+				preview.createDiv("mermaid-theme-preview-node").setText("Decision");
 				preview.createDiv("mermaid-theme-preview-edge is-muted");
-				preview.createDiv("mermaid-theme-preview-node is-series-3").setText("Done");
+				preview.createDiv("mermaid-theme-preview-node").setText("Done");
 				const swatches = button.createDiv("mermaid-theme-swatches");
 				previewColors.slice(0, 6).forEach((_, index) => swatches.createSpan({ cls: `mermaid-theme-swatch series-${index + 1}` }));
 				const caption = button.createDiv("mermaid-theme-card-caption");

@@ -1,10 +1,8 @@
-# Mermaid Themes
+# Mermaid Beautify
 
 This is a plugin for [Obsidian](https://obsidian.md). It was generated based on the [standard plugin template](https://github.com/obsidianmd/obsidian-sample-plugin).
 
 This project allows the user to easily apply and customize themes to mermaid.js diagrams in obsidian.
-
-This plugin is supported by advertisements.
 
 Note: this plugin is still in development, and there may be some bugs. Please report any issues you find.
 

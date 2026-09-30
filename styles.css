@@ -93,6 +93,8 @@
 	position: absolute;
 	top: 0;
 	left: 0;
+	width: fit-content;
+	height: fit-content;
 	transform-origin: top left;
 	will-change: transform;
 }
@@ -224,34 +226,17 @@
 	flex: 0 1 auto;
 }
 
-.mermaid-theme-preview-node.is-series-1,
-.mermaid-theme-preview-node.is-series-2,
-.mermaid-theme-preview-node.is-series-3 {
-	border-color: var(--preview-series-1, var(--preview-border));
-	box-shadow: inset 0 2px 0 var(--preview-series-1, var(--preview-border));
-}
-
-.mermaid-theme-preview-node.is-series-2 {
-	border-color: var(--preview-series-2, var(--preview-border));
-	box-shadow: inset 0 2px 0 var(--preview-series-2, var(--preview-border));
-}
-
-.mermaid-theme-preview-node.is-series-3 {
-	border-color: var(--preview-series-3, var(--preview-border));
-	box-shadow: inset 0 2px 0 var(--preview-series-3, var(--preview-border));
-}
-
 .mermaid-theme-preview-edge {
 	width: clamp(8px, 8%, 18px);
 	min-width: 6px;
 	flex: 0 1 18px;
 	height: 2px;
 	margin-inline: 2px;
-	background: var(--preview-accent);
+	background: var(--preview-edge);
 }
 
 .mermaid-theme-preview-edge.is-muted {
-	background: var(--preview-muted);
+	opacity: 0.55;
 }
 
 .mermaid-theme-card-caption {
