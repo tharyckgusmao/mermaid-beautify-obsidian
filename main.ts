@@ -66,10 +66,12 @@ function mixHex(foreground: string, background: string, backgroundWeight: number
 }
 
 function getPaletteVisuals(palette: ThemePalette) {
+	const surface = mixHex(palette.surface, palette.bg, 0.42);
 	return {
-		nodeFill: mixHex(palette.accent, palette.surface, 0.94),
+		nodeFill: mixHex(palette.accent, surface, 0.97),
+		sectionFill: mixHex(surface, palette.bg, 0.45),
 		nodeBorder: mixHex(palette.accent, palette.border, 0.72),
-		connector: mixHex(palette.fg, palette.bg, palette.group === "Light" ? 0.14 : 0.2),
+		connector: palette.accent,
 	};
 }
 
@@ -272,17 +274,22 @@ export default class MermaidThemePlugin extends Plugin {
 		canvas.className = "mermaid-theme-zoom-modal-canvas";
 		const svg = sourceSvg.cloneNode(true) as SVGSVGElement;
 		const viewBox = svg.viewBox?.baseVal;
-		let width = viewBox?.width || parseFloat(svg.getAttribute("width") || "") || sourceSvg.getBoundingClientRect().width || 300;
-		let height = viewBox?.height || parseFloat(svg.getAttribute("height") || "") || sourceSvg.getBoundingClientRect().height || 200;
+		const sourceRect = sourceSvg.getBoundingClientRect();
+		const baseViewBox = {
+			x: viewBox?.x || 0,
+			y: viewBox?.y || 0,
+			width: viewBox?.width || sourceRect.width || 300,
+			height: viewBox?.height || sourceRect.height || 200,
+		};
 		svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-		// The inline renderer sets pixel width/height for its own viewport.
-		// Restore a natural SVG size in the modal so those inline constraints
-		// do not distort the copied diagram when the wrapper is transformed.
-		if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
-			svg.style.removeProperty("width");
-			svg.style.removeProperty("height");
-			svg.style.maxWidth = `${viewBox.width}px`;
-		}
+		// Modal zoom changes the SVG viewBox instead of scaling the rendered
+		// element. This keeps the diagram vector based at every zoom level.
+		svg.style.width = "100%";
+		svg.style.height = "100%";
+		svg.style.maxWidth = "none";
+		svg.setAttribute("viewBox", `${baseViewBox.x} ${baseViewBox.y} ${baseViewBox.width} ${baseViewBox.height}`);
+		canvas.style.width = "100%";
+		canvas.style.height = "100%";
 		canvas.appendChild(svg);
 		viewport.appendChild(canvas);
 
@@ -305,47 +312,61 @@ export default class MermaidThemePlugin extends Plugin {
 			return button;
 		};
 
-		let scale = 1;
-		let fitScale = 1;
-		let x = 0;
-		let y = 0;
+		let currentViewBox = { ...baseViewBox };
 		let dragging = false;
 		let startX = 0;
 		let startY = 0;
-		const applyTransform = () => {
-			canvas.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+		let startViewBox = { ...baseViewBox };
+		const viewBoxScale = (box: typeof baseViewBox) => {
+			const rect = viewport.getBoundingClientRect();
+			return Math.min(rect.width / box.width, rect.height / box.height);
+		};
+		const applyViewBox = () => {
+			svg.setAttribute("viewBox", `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
 			canvas.style.cursor = dragging ? "grabbing" : "grab";
-			scaleLabel.textContent = `${Math.round(scale * 100)}%`;
+			scaleLabel.textContent = `${Math.round((baseViewBox.width / currentViewBox.width) * 100)}%`;
 		};
-		const updateScale = (nextScale: number, anchorX = viewport.clientWidth / 2, anchorY = viewport.clientHeight / 2) => {
-			const next = Math.max(0.1, Math.min(5, nextScale));
-			const ratio = next / scale;
-			x = anchorX - (anchorX - x) * ratio;
-			y = anchorY - (anchorY - y) * ratio;
-			scale = next;
-			applyTransform();
+		const zoomAt = (nextZoom: number, screenX = viewport.clientWidth / 2, screenY = viewport.clientHeight / 2) => {
+			const zoom = Math.max(0.1, Math.min(5, nextZoom));
+			const rect = viewport.getBoundingClientRect();
+			const oldUnit = viewBoxScale(currentViewBox);
+			if (!oldUnit || !rect.width || !rect.height) return;
+			const oldDrawWidth = currentViewBox.width * oldUnit;
+			const oldDrawHeight = currentViewBox.height * oldUnit;
+			const oldOffsetX = (rect.width - oldDrawWidth) / 2;
+			const oldOffsetY = (rect.height - oldDrawHeight) / 2;
+			const anchorSvgX = currentViewBox.x + Math.max(0, Math.min(currentViewBox.width, (screenX - oldOffsetX) / oldUnit));
+			const anchorSvgY = currentViewBox.y + Math.max(0, Math.min(currentViewBox.height, (screenY - oldOffsetY) / oldUnit));
+			const nextWidth = baseViewBox.width / zoom;
+			const nextHeight = baseViewBox.height / zoom;
+			const nextUnit = Math.min(rect.width / nextWidth, rect.height / nextHeight);
+			const nextOffsetX = (rect.width - nextWidth * nextUnit) / 2;
+			const nextOffsetY = (rect.height - nextHeight * nextUnit) / 2;
+			currentViewBox = {
+				x: anchorSvgX - (screenX - nextOffsetX) / nextUnit,
+				y: anchorSvgY - (screenY - nextOffsetY) / nextUnit,
+				width: nextWidth,
+				height: nextHeight,
+			};
+			applyViewBox();
 		};
-		addControl("−", "Zoom out", () => updateScale(scale / 1.2));
-		addControl("+", "Zoom in", () => updateScale(scale * 1.2));
+		const resetView = () => {
+			currentViewBox = { ...baseViewBox };
+			applyViewBox();
+		};
+		addControl("−", "Zoom out", () => zoomAt((baseViewBox.width / currentViewBox.width) / 1.2));
+		addControl("+", "Zoom in", () => zoomAt((baseViewBox.width / currentViewBox.width) * 1.2));
 		addControl("↺", "Fit diagram", () => {
-			scale = fitScale;
-			x = Math.max(0, (viewport.clientWidth - width * scale) / 2);
-			y = Math.max(0, (viewport.clientHeight - height * scale) / 2);
-			applyTransform();
+			resetView();
 		});
 		controls.appendChild(scaleLabel);
 		let isClosed = false;
 		const closeButton = addControl("×", "Close fullscreen view", () => closeModal());
 		const handleKeydown = (event: KeyboardEvent) => {
 			if (event.key === "Escape") closeModal();
-			else if (event.key === "+" || event.key === "=") updateScale(scale * 1.2);
-			else if (event.key === "-") updateScale(scale / 1.2);
-			else if (event.key === "0") {
-				scale = fitScale;
-				x = Math.max(0, (viewport.clientWidth - width * scale) / 2);
-				y = Math.max(0, (viewport.clientHeight - height * scale) / 2);
-				applyTransform();
-			}
+			else if (event.key === "+" || event.key === "=") zoomAt((baseViewBox.width / currentViewBox.width) * 1.2);
+			else if (event.key === "-") zoomAt((baseViewBox.width / currentViewBox.width) / 1.2);
+			else if (event.key === "0") resetView();
 		};
 		const closeModal = () => {
 			if (isClosed) return;
@@ -359,23 +380,29 @@ export default class MermaidThemePlugin extends Plugin {
 		viewport.addEventListener("wheel", (event) => {
 			event.preventDefault();
 			const rect = viewport.getBoundingClientRect();
-			updateScale(scale * (event.deltaY < 0 ? 1.1 : 1 / 1.1), event.clientX - rect.left, event.clientY - rect.top);
+			zoomAt((baseViewBox.width / currentViewBox.width) * (event.deltaY < 0 ? 1.1 : 1 / 1.1), event.clientX - rect.left, event.clientY - rect.top);
 		}, { passive: false });
 		viewport.addEventListener("pointerdown", (event) => {
 			if (event.button !== 0) return;
 			dragging = true;
-			startX = event.clientX - x;
-			startY = event.clientY - y;
+			startX = event.clientX;
+			startY = event.clientY;
+			startViewBox = { ...currentViewBox };
 			viewport.setPointerCapture(event.pointerId);
-			applyTransform();
+			applyViewBox();
 		});
 		viewport.addEventListener("pointermove", (event) => {
 			if (!dragging) return;
-			x = event.clientX - startX;
-			y = event.clientY - startY;
-			applyTransform();
+			const unit = viewBoxScale(startViewBox);
+			if (!unit) return;
+			currentViewBox = {
+				...startViewBox,
+				x: startViewBox.x - (event.clientX - startX) / unit,
+				y: startViewBox.y - (event.clientY - startY) / unit,
+			};
+			applyViewBox();
 		});
-		const stopDragging = () => { dragging = false; applyTransform(); };
+		const stopDragging = () => { dragging = false; applyViewBox(); };
 		viewport.addEventListener("pointerup", stopDragging);
 		viewport.addEventListener("pointercancel", stopDragging);
 
@@ -384,15 +411,7 @@ export default class MermaidThemePlugin extends Plugin {
 		document.body.appendChild(modal);
 		document.addEventListener("keydown", handleKeydown);
 		window.requestAnimationFrame(() => {
-			const cloneRect = svg.getBoundingClientRect();
-			width = cloneRect.width || viewBox?.width || width;
-			height = cloneRect.height || viewBox?.height || height;
-			fitScale = Math.min(2, (viewport.clientWidth - 64) / width, (viewport.clientHeight - 64) / height);
-			fitScale = fitScale > 0 ? fitScale : 1;
-			scale = fitScale;
-			x = Math.max(0, (viewport.clientWidth - width * scale) / 2);
-			y = Math.max(0, (viewport.clientHeight - height * scale) / 2);
-			applyTransform();
+			applyViewBox();
 			modal.focus();
 			closeButton.focus();
 		});
@@ -429,12 +448,12 @@ export default class MermaidThemePlugin extends Plugin {
 
 	private getPaletteConfig(palette: ThemePalette) {
 		const { bg, fg, accent, muted, surface, border } = palette;
-		const { nodeFill, nodeBorder, connector } = getPaletteVisuals(palette);
+		const { nodeFill, sectionFill, nodeBorder, connector } = getPaletteVisuals(palette);
 		const seriesColors = palette.seriesColors ?? [accent, muted, border, fg, accent, muted, border, fg, accent, muted, border, fg];
 		const seriesFills = palette.seriesFills ?? [surface, bg, surface, bg, surface, bg, surface, bg, surface, bg, surface, bg];
-		const accentSoft = mixHex(accent, bg, 0.78);
-		const mutedSoft = mixHex(muted, bg, 0.78);
-		const critical = mixHex("#e5484d", bg, 0.76);
+		const accentSoft = mixHex(accent, bg, 0.9);
+		const mutedSoft = mixHex(muted, bg, 0.9);
+		const critical = mixHex("#e5484d", bg, 0.9);
 		const colorVariables: Anything = {};
 		seriesColors.forEach((color, index) => {
 			colorVariables[`cScale${index}`] = color;
@@ -442,7 +461,7 @@ export default class MermaidThemePlugin extends Plugin {
 			colorVariables[`git${index}`] = color;
 		});
 		seriesFills.slice(0, 8).forEach((color, index) => {
-			colorVariables[`fillType${index}`] = color;
+			colorVariables[`fillType${index}`] = mixHex(color, bg, 0.3);
 		});
 		return {
 			theme: "base",
@@ -453,16 +472,16 @@ export default class MermaidThemePlugin extends Plugin {
 				primaryTextColor: fg,
 				primaryBorderColor: nodeBorder,
 				lineColor: connector,
-				secondaryColor: bg,
+				secondaryColor: sectionFill,
 				secondaryTextColor: fg,
 				secondaryBorderColor: nodeBorder,
-				tertiaryColor: surface,
+				tertiaryColor: sectionFill,
 				tertiaryTextColor: fg,
 				tertiaryBorderColor: nodeBorder,
 				textColor: fg,
 				mainBkg: nodeFill,
 				secondBkg: bg,
-				clusterBkg: bg,
+				clusterBkg: sectionFill,
 				clusterBorder: nodeBorder,
 				nodeBorder,
 				defaultLinkColor: connector,
@@ -478,11 +497,11 @@ export default class MermaidThemePlugin extends Plugin {
 				noteBkgColor: nodeFill,
 				noteTextColor: fg,
 				noteBorderColor: nodeBorder,
-				sectionBkgColor: surface,
+				sectionBkgColor: sectionFill,
 				sectionBkgColor2: bg,
 				altSectionBkgColor: bg,
 				excludeBkgColor: mutedSoft,
-				taskBkgColor: surface,
+				taskBkgColor: nodeFill,
 			taskBorderColor: border,
 				activeTaskBkgColor: accentSoft,
 				activeTaskBorderColor: accent,
