@@ -164,43 +164,73 @@ export default class MermaidThemePlugin extends Plugin {
 		if (!svg) return;
 
 		const viewBox = svg.viewBox?.baseVal;
-		const width = viewBox?.width || parseFloat(svg.getAttribute("width") || "") || svg.getBoundingClientRect().width || 300;
-		const height = viewBox?.height || parseFloat(svg.getAttribute("height") || "") || svg.getBoundingClientRect().height || 200;
+		const sourceRect = svg.getBoundingClientRect();
+		const baseViewBox = {
+			x: viewBox?.x || 0,
+			y: viewBox?.y || 0,
+			width: viewBox?.width || parseFloat(svg.getAttribute("width") || "") || sourceRect.width || 300,
+			height: viewBox?.height || parseFloat(svg.getAttribute("height") || "") || sourceRect.height || 200,
+		};
+		const baseViewBoxValue = `${baseViewBox.x} ${baseViewBox.y} ${baseViewBox.width} ${baseViewBox.height}`;
+		svg.dataset.mermaidBaseViewBox = baseViewBoxValue;
+		svg.setAttribute("viewBox", baseViewBoxValue);
 		svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-		svg.style.width = `${width}px`;
-		svg.style.height = `${height}px`;
+		svg.style.width = "100%";
+		svg.style.height = "100%";
 		svg.style.maxWidth = "none";
-		canvas.style.width = `${width}px`;
-		canvas.style.height = `${height}px`;
+		canvas.style.width = "100%";
+		canvas.style.height = "100%";
 
-		let scale = 1;
-		let fitScale = 1;
-		let x = 0;
-		let y = 0;
+		let currentViewBox = { ...baseViewBox };
 		let dragging = false;
 		let startX = 0;
 		let startY = 0;
 		let wheelZoom = false;
 		const pointers = new Map<number, { x: number; y: number }>();
 		let pinchStartDistance = 0;
-		let pinchStartScale = 1;
-		const getFitScale = () => Math.min(1, viewport.clientWidth / width, viewport.clientHeight / height);
-		const applyTransform = () => {
-			canvas.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-			canvas.style.cursor = scale > fitScale ? (dragging ? "grabbing" : "grab") : "default";
-			zoomLevel.setText(`${Math.round(scale * 100)}%`);
+		let pinchStartZoom = 1;
+		let startViewBox = { ...baseViewBox };
+		const viewBoxScale = (box: typeof baseViewBox) => {
+			const rect = viewport.getBoundingClientRect();
+			return Math.min(rect.width / box.width, rect.height / box.height);
 		};
-		const updateScale = (nextScale: number, anchorX = viewport.clientWidth / 2, anchorY = viewport.clientHeight / 2) => {
-			const next = Math.max(0.1, Math.min(5, nextScale));
-			const ratio = next / scale;
-			x = anchorX - (anchorX - x) * ratio;
-			y = anchorY - (anchorY - y) * ratio;
-			scale = next;
-			applyTransform();
+		const getZoom = () => baseViewBox.width / currentViewBox.width;
+		const applyViewBox = () => {
+			svg.setAttribute("viewBox", `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+			canvas.style.cursor = dragging || getZoom() > 1 ? (dragging ? "grabbing" : "grab") : "default";
+			zoomLevel.setText(`${Math.round(getZoom() * 100)}%`);
 		};
-		makeButton("−", "Zoom out", () => updateScale(scale / 1.2));
-		makeButton("+", "Zoom in", () => updateScale(scale * 1.2));
-		makeButton("↺", "Reset zoom", () => { scale = fitScale; x = 0; y = 0; applyTransform(); });
+		const zoomAt = (nextZoom: number, screenX = viewport.clientWidth / 2, screenY = viewport.clientHeight / 2) => {
+			const zoom = Math.max(0.1, Math.min(5, nextZoom));
+			const rect = viewport.getBoundingClientRect();
+			const oldUnit = viewBoxScale(currentViewBox);
+			if (!oldUnit || !rect.width || !rect.height) return;
+			const oldDrawWidth = currentViewBox.width * oldUnit;
+			const oldDrawHeight = currentViewBox.height * oldUnit;
+			const oldOffsetX = (rect.width - oldDrawWidth) / 2;
+			const oldOffsetY = (rect.height - oldDrawHeight) / 2;
+			const anchorSvgX = currentViewBox.x + Math.max(0, Math.min(currentViewBox.width, (screenX - oldOffsetX) / oldUnit));
+			const anchorSvgY = currentViewBox.y + Math.max(0, Math.min(currentViewBox.height, (screenY - oldOffsetY) / oldUnit));
+			const nextWidth = baseViewBox.width / zoom;
+			const nextHeight = baseViewBox.height / zoom;
+			const nextUnit = Math.min(rect.width / nextWidth, rect.height / nextHeight);
+			const nextOffsetX = (rect.width - nextWidth * nextUnit) / 2;
+			const nextOffsetY = (rect.height - nextHeight * nextUnit) / 2;
+			currentViewBox = {
+				x: anchorSvgX - (screenX - nextOffsetX) / nextUnit,
+				y: anchorSvgY - (screenY - nextOffsetY) / nextUnit,
+				width: nextWidth,
+				height: nextHeight,
+			};
+			applyViewBox();
+		};
+		const resetView = () => {
+			currentViewBox = { ...baseViewBox };
+			applyViewBox();
+		};
+		makeButton("−", "Zoom out", () => zoomAt(getZoom() / 1.2));
+		makeButton("+", "Zoom in", () => zoomAt(getZoom() * 1.2));
+		makeButton("↺", "Reset zoom", resetView);
 		makeButton("⛶", "Open diagram fullscreen", () => this.openZoomModal(svg));
 		const zoomLevel = controls.createSpan({ cls: "mermaid-zoom-level", text: "100%" });
 		const wheelButton = makeButton("Scroll", "Toggle wheel zoom", () => {
@@ -213,7 +243,7 @@ export default class MermaidThemePlugin extends Plugin {
 			if (!wheelZoom) return;
 			event.preventDefault();
 			const rect = viewport.getBoundingClientRect();
-			updateScale(scale * (event.deltaY < 0 ? 1.1 : 1 / 1.1), event.clientX - rect.left, event.clientY - rect.top);
+			zoomAt(getZoom() * (event.deltaY < 0 ? 1.1 : 1 / 1.1), event.clientX - rect.left, event.clientY - rect.top);
 		}, { passive: false });
 		viewport.addEventListener("pointerdown", (event) => {
 			if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
@@ -222,14 +252,15 @@ export default class MermaidThemePlugin extends Plugin {
 			if (pointers.size === 2) {
 				const [first, second] = Array.from(pointers.values());
 				pinchStartDistance = Math.hypot(second.x - first.x, second.y - first.y);
-				pinchStartScale = scale;
+				pinchStartZoom = getZoom();
 				dragging = false;
 				return;
 			}
 			dragging = true;
-			startX = event.clientX - x;
-			startY = event.clientY - y;
-			applyTransform();
+			startX = event.clientX;
+			startY = event.clientY;
+			startViewBox = { ...currentViewBox };
+			applyViewBox();
 		});
 		viewport.addEventListener("pointermove", (event) => {
 			if (pointers.has(event.pointerId)) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -237,26 +268,29 @@ export default class MermaidThemePlugin extends Plugin {
 				const [first, second] = Array.from(pointers.values());
 				const distance = Math.hypot(second.x - first.x, second.y - first.y);
 				const center = viewport.getBoundingClientRect();
-				updateScale(pinchStartScale * distance / pinchStartDistance, (first.x + second.x) / 2 - center.left, (first.y + second.y) / 2 - center.top);
+				zoomAt(pinchStartZoom * distance / pinchStartDistance, (first.x + second.x) / 2 - center.left, (first.y + second.y) / 2 - center.top);
 				return;
 			}
 			if (!dragging) return;
-			x = event.clientX - startX;
-			y = event.clientY - startY;
-			applyTransform();
+			const unit = viewBoxScale(startViewBox);
+			if (!unit) return;
+			currentViewBox = {
+				...startViewBox,
+				x: startViewBox.x - (event.clientX - startX) / unit,
+				y: startViewBox.y - (event.clientY - startY) / unit,
+			};
+			applyViewBox();
 		});
 		const stopDragging = (event: PointerEvent) => {
 			pointers.delete(event.pointerId);
 			pinchStartDistance = 0;
 			dragging = false;
-			applyTransform();
+			applyViewBox();
 		};
 		viewport.addEventListener("pointerup", stopDragging);
 		viewport.addEventListener("pointercancel", stopDragging);
 		window.requestAnimationFrame(() => {
-			fitScale = getFitScale();
-			scale = fitScale || 1;
-			applyTransform();
+			applyViewBox();
 		});
 	}
 
@@ -275,11 +309,12 @@ export default class MermaidThemePlugin extends Plugin {
 		const svg = sourceSvg.cloneNode(true) as SVGSVGElement;
 		const viewBox = svg.viewBox?.baseVal;
 		const sourceRect = sourceSvg.getBoundingClientRect();
+		const savedViewBox = sourceSvg.dataset.mermaidBaseViewBox?.trim().split(/[ ,]+/).map(Number);
 		const baseViewBox = {
-			x: viewBox?.x || 0,
-			y: viewBox?.y || 0,
-			width: viewBox?.width || sourceRect.width || 300,
-			height: viewBox?.height || sourceRect.height || 200,
+			x: savedViewBox?.length === 4 && Number.isFinite(savedViewBox[0]) ? savedViewBox[0] : viewBox?.x || 0,
+			y: savedViewBox?.length === 4 && Number.isFinite(savedViewBox[1]) ? savedViewBox[1] : viewBox?.y || 0,
+			width: savedViewBox?.length === 4 && Number.isFinite(savedViewBox[2]) ? savedViewBox[2] : viewBox?.width || sourceRect.width || 300,
+			height: savedViewBox?.length === 4 && Number.isFinite(savedViewBox[3]) ? savedViewBox[3] : viewBox?.height || sourceRect.height || 200,
 		};
 		svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 		// Modal zoom changes the SVG viewBox instead of scaling the rendered

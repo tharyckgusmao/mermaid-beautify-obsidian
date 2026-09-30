@@ -58,10 +58,16 @@
 
 .mermaid-zoom-canvas {
 	position: absolute;
-	top: 0;
-	left: 0;
-	transform-origin: top left;
-	will-change: transform;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.mermaid-zoom-canvas > svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	max-width: none;
 }
 
 .mermaid-theme-zoom-modal {
